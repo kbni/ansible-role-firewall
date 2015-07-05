@@ -7,6 +7,19 @@
   apt: pkg=iptables state=installed
   when: ansible_os_family == 'Debian'
 
+- name: Make IP block directories
+  file: state=directory owner=root group=root mode=0744 path={{ item }}
+  with_items:
+  - /etc/ipblocks
+  - /etc/ipblocks/6
+  - /etc/ipblocks/4
+
+- name: Unarchive IP block zone files (thanks, ipdeny.com!)
+  unarchive: src="{{ item.url }}" dest="{{ item.dest }}"
+  with_items:
+  - { url: 'ipv4-zones.tgz', dest: '/etc/ipblocks/4' }
+  - { url: 'ipv6-zones.tgz', dest: '/etc/ipblocks/6' }
+
 - name: Flush iptables the first time playbook runs.
   command: iptables -F creates=/etc/init.d/firewall
 

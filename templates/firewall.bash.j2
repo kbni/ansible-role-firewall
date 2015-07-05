@@ -34,7 +34,7 @@ iptables -F
 iptables -X
 
 # Accept traffic from loopback interface (localhost).
-iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -i lo -j ACCEPT --comment "accept traffic from loopback interface"
 
 # Forwarded ports.
 {# Add a rule for each forwarded port #}
@@ -47,37 +47,77 @@ iptables -t nat -I PREROUTING -p udp --dport {{ forwarded_port.src }} -j REDIREC
 iptables -t nat -I OUTPUT -p udp -o lo --dport {{ forwarded_port.src }} -j REDIRECT --to-port {{ forwarded_port.dest }}
 {% endfor %}
 
-# Open ports.
-{# Add a rule for each open port #}
-{% for port in firewall_allowed_tcp_ports %}
-iptables -A INPUT -p tcp -m tcp --dport {{ port }} -j ACCEPT
-{% endfor %}
-{% for port in firewall_allowed_udp_ports %}
-iptables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
-{% endfor %}
+# firewall_rules....
+{% for rule in firewall_rules %}
 
-# Accept icmp ping requests.
-iptables -A INPUT -p icmp -j ACCEPT
+{# start opening shell loops #}
+{% if rule.loop_chains is defined %}
+for loop_chain in {{ rule.loop_chains }}; do
+{% endif %}
+{% if rule.loop_dports is defined %}
+for loop_dport in {{ rule.loop_dports }}; do
+{% endif %}
+{% if rule.loop_sources is defined %}
+for loop_source in {{ rule.loop_source }}; do
+{% endif %}
+{% if rule.loop_dests is defined %}
+for loop_dest in {{ rule.loop_dests }}; do
+{% endif %}
+{% if rule.loop_protos is defined %}
+for loop_proto in {{ rule.loop_protos }}; do
+{% endif %}
+{% if rule.loop_zones is defined %}
+cat /etc/ipblocks/4/{{ rule.loop_zones }}.zone | while read zone_line; do
+{% endif %}
+{# finish opening shell loops #}
+{# begin firewall rule #}
+{% if rule.loop_chains is not defined %}iptables -A {{ rule.chain | default('INPUT') }}{% endif %}
+{% if rule.loop_chain is defined %} -A "$loop_chain"{% endif %}
+{% if rule.proto is defined %} -p {{ rule.proto }}{% endif %}
+{% if rule.dport is defined %} --dport {{ rule.dport }}{% endif %}
+{% if rule.sport is defined %} --sport {{ rule.sport }}{% endif %}
+{% if rule.dev_out is defined %} -o {{ rule.dev_out }}{% endif %}
+{% if rule.dev_in is defined %} -i {{ rule.dev_in }}{% endif %}
+{% if rule.source is defined %} -s {{ rule.source }}{% endif %}
+{% if rule.dest is defined %} -d {{ rule.dest }}{% endif %}
+{% if rule.state is defined %} -m state --state {{ rule.state }}{% endif %}
+{% if rule.loop_zones is defined %} -s "$zone_line"{% endif %}
+{% if rule.loop_protos is defined %} -p "$loop_proto"{% endif %}
+{% if rule.loop_dports is defined %} --dport "$loop_dport"{% endif %}
+{% if rule.loop_sources is defined %} --source "$loop_source"{% endif %}
+{% if rule.loop_dests is defined %} --dest "$loop_dest"{% endif %}
+{% if True %} -j {{ rule.jump | default('ACCEPT') }}{% endif %}
+{% if rule.comment is defined %} -m comment --comment "{{ rule.comment }}"{% endif %}
+{# finish firewall rule #}
+{# start closing shell loops #}
+{% if rule.loop_protos is defined %}; done{% endif %}
+{% if rule.loop_chains is defined %}; done{% endif %}
+{% if rule.loop_dports is defined %}; done{% endif %}
+{% if rule.loop_sources is defined %}; done{% endif %}
+{% if rule.loop_dests is defined %}; done{% endif %}
+{% if rule.loop_zones is defined %}; done{% endif %}
+{# finish closing shell loops #}
+
+{% endfor %}
 
 # Allow NTP traffic for time synchronization.
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
-iptables -A INPUT -p udp --sport 123 -j ACCEPT
-
-# Additional custom rules.
-{% for rule in firewall_additional_rules %}
-{{ rule }}
-{% endfor %}
+iptables -A OUTPUT -p udp --dport 123 -j ACCEPT --comment "Allow NTP traffic for time sync"
+iptables -A INPUT -p udp --sport 123 -j ACCEPT --comment "Allow NTP traffic for time sync"
 
 # Allow established connections:
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
+{% if firewall_debug %}
 # Log EVERYTHING (ONLY for Debug).
-# iptables -A INPUT -j LOG
-
+iptables -A INPUT -j LOG
+{% endif %}
 {% if firewall_log_dropped_packets %}
 # Log other incoming requests (all of which are dropped) at 15/minute max.
 iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
 {% endif %}
-
-# Drop all other traffic.
-iptables -A INPUT -j DROP
+{% if firewall_drop_incoming %}
+iptables -A INPUT -j DROP --comment "Drop all other incoming traffic"
+{% endif %}
+{% if firewall_drop_outgoing %}
+iptables -A OUTPUT -j DROP --comment "Drop all other outgoing traffic"
+{% endif %}

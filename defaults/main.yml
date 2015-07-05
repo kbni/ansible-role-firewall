@@ -1,11 +1,9 @@
 ---
-firewall_allowed_tcp_ports:
-  - "22"
-  - "25"
-  - "80"
-  - "443"
-firewall_allowed_udp_ports: []
+firewall_debug: false
+firewall_log_drops: false
 firewall_forwarded_tcp_ports: []
 firewall_forwarded_udp_ports: []
-firewall_additional_rules: []
-firewall_log_dropped_packets: true
+firewall_drop_incoming: false
+firewall_drop_outgoing: false
+firewall_rules: 
+- { dport: 22, proto: 'tcp' }
