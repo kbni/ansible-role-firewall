@@ -34,7 +34,7 @@ iptables -F
 iptables -X
 
 # Accept traffic from loopback interface (localhost).
-iptables -A INPUT -i lo -j ACCEPT --comment "accept traffic from loopback interface"
+iptables -A INPUT -i lo -j ACCEPT -m comment --comment "accept traffic from loopback interface"
 
 # Forwarded ports.
 {# Add a rule for each forwarded port #}
@@ -73,6 +73,7 @@ cat /etc/ipblocks/4/{{ rule.loop_zones }}.zone | while read zone_line; do
 {# begin firewall rule #}
 {% if rule.loop_chains is not defined %}iptables -A {{ rule.chain | default('INPUT') }}{% endif %}
 {% if rule.loop_chain is defined %} -A "$loop_chain"{% endif %}
+{% if rule.loop_protos is defined %} -p "$loop_proto"{% endif %}
 {% if rule.proto is defined %} -p {{ rule.proto }}{% endif %}
 {% if rule.dport is defined %} --dport {{ rule.dport }}{% endif %}
 {% if rule.sport is defined %} --sport {{ rule.sport }}{% endif %}
@@ -82,7 +83,6 @@ cat /etc/ipblocks/4/{{ rule.loop_zones }}.zone | while read zone_line; do
 {% if rule.dest is defined %} -d {{ rule.dest }}{% endif %}
 {% if rule.state is defined %} -m state --state {{ rule.state }}{% endif %}
 {% if rule.loop_zones is defined %} -s "$zone_line"{% endif %}
-{% if rule.loop_protos is defined %} -p "$loop_proto"{% endif %}
 {% if rule.loop_dports is defined %} --dport "$loop_dport"{% endif %}
 {% if rule.loop_sources is defined %} --source "$loop_source"{% endif %}
 {% if rule.loop_dests is defined %} --dest "$loop_dest"{% endif %}
@@ -101,8 +101,8 @@ cat /etc/ipblocks/4/{{ rule.loop_zones }}.zone | while read zone_line; do
 {% endfor %}
 
 # Allow NTP traffic for time synchronization.
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT --comment "Allow NTP traffic for time sync"
-iptables -A INPUT -p udp --sport 123 -j ACCEPT --comment "Allow NTP traffic for time sync"
+iptables -A OUTPUT -p udp --dport 123 -j ACCEPT -m comment --comment "Allow NTP traffic for time sync"
+iptables -A INPUT -p udp --sport 123 -j ACCEPT -m comment --comment "Allow NTP traffic for time sync"
 
 # Allow established connections:
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
@@ -116,8 +116,8 @@ iptables -A INPUT -j LOG
 iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
 {% endif %}
 {% if firewall_drop_incoming %}
-iptables -A INPUT -j DROP --comment "Drop all other incoming traffic"
+iptables -A INPUT -j DROP -m comment --comment "Drop all other incoming traffic"
 {% endif %}
 {% if firewall_drop_outgoing %}
-iptables -A OUTPUT -j DROP --comment "Drop all other outgoing traffic"
+iptables -A OUTPUT -j DROP -m comment --comment "Drop all other outgoing traffic"
 {% endif %}
